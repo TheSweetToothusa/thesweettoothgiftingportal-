@@ -1,0 +1,1 @@
+ALTER TABLE `giftingOrders` MODIFY COLUMN `userId` int;

@@ -1,0 +1,42 @@
+CREATE TABLE `giftingOrders` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`userId` int NOT NULL,
+	`senderName` varchar(255) NOT NULL,
+	`senderEmail` varchar(320) NOT NULL,
+	`senderPhone` varchar(50) NOT NULL,
+	`senderCompany` varchar(255),
+	`senderAddress` text,
+	`globalGiftMessage` text,
+	`globalDeliveryDate` timestamp,
+	`shopifyParentDraftOrderId` varchar(100),
+	`status` enum('draft','validated','submitted','completed') NOT NULL DEFAULT 'draft',
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `giftingOrders_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `recipients` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`giftingOrderId` int NOT NULL,
+	`recipientName` varchar(255) NOT NULL,
+	`recipientEmail` varchar(320),
+	`recipientPhone` varchar(50),
+	`address1` varchar(255) NOT NULL,
+	`address2` varchar(255),
+	`city` varchar(100) NOT NULL,
+	`state` varchar(50) NOT NULL,
+	`zip` varchar(20) NOT NULL,
+	`country` varchar(2) NOT NULL DEFAULT 'US',
+	`productVariantId` varchar(100),
+	`productName` varchar(255),
+	`deliveryDate` timestamp NOT NULL,
+	`deliveryMethod` enum('local_delivery','shipping','store_pickup') DEFAULT 'local_delivery',
+	`deliveryInstructions` text,
+	`customGiftMessage` text,
+	`validationStatus` enum('valid','warning','error') DEFAULT 'valid',
+	`validationErrors` text,
+	`shopifyChildOrderId` varchar(100),
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `recipients_id` PRIMARY KEY(`id`)
+);
