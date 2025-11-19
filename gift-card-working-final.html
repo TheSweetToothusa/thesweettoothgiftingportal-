@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Corporate Gift Card Interface</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Dancing+Script:wght@400;700&family=Pacifico&family=Caveat:wght@400;700&family=Indie+Flower&family=Shadows+Into+Light&family=Amatic+SC:wght@400;700&family=Permanent+Marker&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: "Inter", "SF Pro Display", "Helvetica Neue", sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background: #F7F7F7;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .panel {
+            background: #FFFFFF;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+        
+        .left-panel {
+            background: #F7F7F7;
+        }
+        
+        .preview-card {
+            width: 100%;
+            max-width: 350px;
+            margin: 0 auto;
+            aspect-ratio: 5/7;
+            background: white;
+            border: 2px solid #e5e5e5;
+            border-radius: 8px;
+            overflow: hidden;
+            position: relative;
+            cursor: not-allowed;
+        }
+        
+        .preview-top {
+            height: 50%;
+            padding: 20px;
+            background: #F7F7F7;
+            border-bottom: 3px dotted #E5E5E5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .preview-bottom {
+            height: 50%;
+            padding: 20px;
+            background: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            position: relative;
+        }
+        
+        #previewMessage {
+            text-align: center;
+            color: #d0d0d0;
+            font-size: 14px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            width: 100%;
+            max-width: 100%;
+            overflow-wrap: break-word;
+            margin-top: 10px;
+            margin-left: auto;
+            margin-right: auto;
+            display: block;
+        }
+        
+        #previewFrom {
+            text-align: center;
+            font-weight: 600;
+            color: #1A1A1A;
+            font-size: 16px;
+            position: absolute;
+            bottom: 20px;
+            left: 0;
+            right: 0;
+            width: 100%;
+            margin: 0 auto;
+        }
+        
+        .fold-line {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 2px 10px;
+            font-size: 9px;
+            color: #9A9A9A;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            z-index: 10;
+        }
+        
+        input[type="range"] {
+            -webkit-appearance: none;
+            width: 100%;
+            height: 4px;
+            border-radius: 2px;
+            outline: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #FFFFFF;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+            border: 1px solid #E5E5E5;
+        }
+        
+        input[type="range"]::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: #FFFFFF;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+            border: 1px solid #E5E5E5;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Left Panel - Form -->
+        <div class="panel left-panel">
+            <h1 style="font-size: 22px; font-weight: 600; color: #1A1A1A; margin-bottom: 22px;">Corporate Gift Message 🎁</h1>
+            
+            <!-- Font Style -->
+            <div style="margin-bottom: 22px;">
+                <label style="display: block; font-size: 14px; font-weight: 400; margin-bottom: 8px; color: #1A1A1A;">Font Style</label>
+                <select id="fontSelect" style="width: 100%; padding: 12px; border: 1px solid #E5E5E5; border-radius: 8px; background: #FFFFFF; color: #1A1A1A; font-size: 14px;">
+                    <option value="Arial">Arial (Classic)</option>
+                    <option value="Georgia">Georgia (Elegant)</option>
+                    <option value="Times New Roman">Times New Roman (Formal)</option>
+                    <option value="'Dancing Script', cursive">Dancing Script (Fancy Script)</option>
+                    <option value="'Pacifico', cursive">Pacifico (Fun & Friendly)</option>
+                    <option value="'Caveat', cursive">Caveat (Handwritten)</option>
+                    <option value="'Indie Flower', cursive">Indie Flower (Casual Handwriting)</option>
+                    <option value="'Shadows Into Light', cursive">Shadows Into Light (Playful)</option>
+                    <option value="'Amatic SC', cursive">Amatic SC (Thin Handwritten)</option>
+                    <option value="'Permanent Marker', cursive">Permanent Marker (Bold Marker)</option>
+                    <option value="Verdana">Verdana (Clean)</option>
+                    <option value="Courier New">Courier New (Typewriter)</option>
+                </select>
+            </div>
+            
+            <!-- Text Size -->
+            <div style="margin-bottom: 22px;">
+                <label style="display: block; font-size: 14px; font-weight: 400; margin-bottom: 8px; color: #1A1A1A;">Text Size</label>
+                <select id="fontSize" style="width: 100%; padding: 12px; border: 1px solid #E5E5E5; border-radius: 8px; background: #FFFFFF; color: #1A1A1A; font-size: 14px;">
+                    <option value="12">Small</option>
+                    <option value="14" selected>Medium</option>
+                    <option value="16">Large</option>
+                    <option value="18">X-Large</option>
+                    <option value="22">XX-Large</option>
+                </select>
+            </div>
+            
+            <!-- Message Size Slider -->
+            <div style="margin-bottom: 22px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <label style="font-size: 14px; color: #1A1A1A;">Gift Message Size</label>
+                    <span id="messageSizeValue" style="font-size: 14px; color: #1A1A1A;">100%</span>
+                </div>
+                <input type="range" id="messageSize" min="50" max="200" value="100">
+                <a href="#" id="resetMessageSize" style="display: block; margin-top: 6px; font-size: 12px; color: #9A9A9A; text-decoration: none;">Reset to Default</a>
+            </div>
+            
+            <!-- Message Position Slider -->
+            <div style="margin-bottom: 22px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <label style="font-size: 14px; color: #1A1A1A;">Message Position</label>
+                    <span id="messagePositionValue" style="font-size: 14px; color: #1A1A1A;">0%</span>
+                </div>
+                <input type="range" id="messagePosition" min="0" max="100" value="0">
+                <div style="display: flex; justify-content: space-between; margin-top: 6px;">
+                    <span style="font-size: 12px; color: #9A9A9A;">Top</span>
+                    <span style="font-size: 12px; color: #9A9A9A;">Bottom</span>
+                </div>
+                <a href="#" id="resetMessagePosition" style="display: block; margin-top: 6px; font-size: 12px; color: #9A9A9A; text-decoration: none;">Reset to Default</a>
+            </div>
+            
+            <!-- Message Textarea -->
+            <div style="margin-bottom: 22px;">
+                <label style="display: block; font-size: 14px; font-weight: 400; margin-bottom: 8px; color: #1A1A1A;">Your Gift Message</label>
+                <textarea id="message" placeholder="Type your gift message here (press Enter for new lines)" maxlength="250" style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid #E5E5E5; border-radius: 8px; background: #FFFFFF; color: #1A1A1A; font-size: 14px; resize: vertical; font-family: inherit; white-space: pre-wrap;"></textarea>
+                <div id="charCounter" style="text-align: right; font-size: 12px; color: #9A9A9A; margin-top: 5px;">0 / 250 characters</div>
+            </div>
+            
+            <!-- From Field -->
+            <div style="margin-bottom: 22px;">
+                <label style="display: block; font-size: 14px; font-weight: 400; margin-bottom: 8px; color: #1A1A1A;">From (Sender Name)</label>
+                <input type="text" id="fromName" placeholder="Your name or company" style="width: 100%; padding: 12px; border: 1px solid #E5E5E5; border-radius: 8px; background: #FFFFFF; color: #1A1A1A; font-size: 14px;">
+            </div>
+            
+            <!-- Signature Size Slider -->
+            <div style="margin-bottom: 22px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <label style="font-size: 14px; color: #1A1A1A;">Signature Size</label>
+                    <span id="signatureSizeValue" style="font-size: 14px; color: #1A1A1A;">100%</span>
+                </div>
+                <input type="range" id="signatureSize" min="50" max="200" value="100">
+                <a href="#" id="resetSignatureSize" style="display: block; margin-top: 6px; font-size: 12px; color: #9A9A9A; text-decoration: none;">Reset to Default</a>
+            </div>
+            
+            <!-- Signature Position Slider -->
+            <div style="margin-bottom: 22px;">
+                <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                    <label style="font-size: 14px; color: #1A1A1A;">Signature Position</label>
+                    <span id="signaturePositionValue" style="font-size: 14px; color: #1A1A1A;">0%</span>
+                </div>
+                <input type="range" id="signaturePosition" min="0" max="100" value="0">
+                <div style="display: flex; justify-content: space-between; margin-top: 6px;">
+                    <span style="font-size: 12px; color: #9A9A9A;">Bottom (Bleed)</span>
+                    <span style="font-size: 12px; color: #9A9A9A;">Higher Up</span>
+                </div>
+                <a href="#" id="resetSignaturePosition" style="display: block; margin-top: 6px; font-size: 12px; color: #9A9A9A; text-decoration: none;">Reset to Default</a>
+            </div>
+            
+            <!-- Buttons -->
+            <button id="clearBtn" style="width: 100%; padding: 12px 24px; background: #FFFFFF; color: #1A1A1A; border: 1px solid #E5E5E5; border-radius: 8px; font-size: 14px; cursor: pointer; margin-bottom: 12px;">
+                🔄 Clear & Start Over
+            </button>
+            
+            <button id="submitBtn" style="width: 100%; padding: 12px 24px; background: #2D7FF9; color: #FFFFFF; border: none; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer;">
+                ✓ Apply to All 47 Recipients & Continue
+            </button>
+            <p style="font-size: 12px; color: #9A9A9A; text-align: center; margin-top: 10px; font-style: italic;">
+                You can edit individual messages in the next step
+            </p>
+        </div>
+        
+        <!-- Right Panel - Preview -->
+        <div class="panel">
+            <h2 style="font-size: 20px; font-weight: 600; color: #1A1A1A; margin-bottom: 22px;">Live Card Preview</h2>
+            <p style="font-size: 12px; color: #9A9A9A; text-align: center; margin-bottom: 20px;">
+                Card folds in half - Top shows outside, Bottom shows inside when opened
+            </p>
+            
+            <div style="position: relative;">
+                <div style="position: absolute; top: -5px; right: -5px; background: #2D7FF9; color: white; padding: 4px 12px; border-radius: 20px; font-size: 10px; font-weight: 500; z-index: 10; text-transform: uppercase; letter-spacing: 0.5px;">
+                    Preview Only
+                </div>
+                
+                <div class="preview-card">
+                    <div class="fold-line">FOLD LINE</div>
+                    
+                    <div class="preview-top">
+                        <div style="text-align: center; color: #9A9A9A; font-size: 12px;">
+                            <div>Recipient Name</div>
+                            <div>Recipient Address</div>
+                        </div>
+                    </div>
+                    
+                    <div class="preview-bottom">
+                        <div id="previewMessage">Your message will appear here...</div>
+                        <div id="previewFrom"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // Get all elements
+        const messageInput = document.getElementById('message');
+        const charCounter = document.getElementById('charCounter');
+        const fromInput = document.getElementById('fromName');
+        const fontSelect = document.getElementById('fontSelect');
+        const fontSize = document.getElementById('fontSize');
+        const messageSize = document.getElementById('messageSize');
+        const messageSizeValue = document.getElementById('messageSizeValue');
+        const messagePosition = document.getElementById('messagePosition');
+        const messagePositionValue = document.getElementById('messagePositionValue');
+        const signatureSize = document.getElementById('signatureSize');
+        const signatureSizeValue = document.getElementById('signatureSizeValue');
+        const signaturePosition = document.getElementById('signaturePosition');
+        const signaturePositionValue = document.getElementById('signaturePositionValue');
+        const previewMessage = document.getElementById('previewMessage');
+        const previewFrom = document.getElementById('previewFrom');
+        const submitBtn = document.getElementById('submitBtn');
+        const clearBtn = document.getElementById('clearBtn');
+        
+        // Update message and character count
+        messageInput.addEventListener('input', function() {
+            const text = this.value;
+            const count = text.length;
+            
+            // Update character counter
+            charCounter.textContent = count + ' / 250 characters';
+            if (count >= 240) {
+                charCounter.style.color = '#ff6b6b';
+            } else {
+                charCounter.style.color = '#9A9A9A';
+            }
+            
+            // Update preview
+            if (text) {
+                previewMessage.textContent = text;
+                previewMessage.style.color = '#1A1A1A';
+            } else {
+                previewMessage.textContent = 'Your message will appear here...';
+                previewMessage.style.color = '#d0d0d0';
+            }
+        });
+        
+        // Update from field
+        fromInput.addEventListener('input', function() {
+            previewFrom.textContent = this.value;
+        });
+        
+        // Font select
+        fontSelect.addEventListener('change', function() {
+            previewMessage.style.fontFamily = this.value;
+            previewFrom.style.fontFamily = this.value;
+        });
+        
+        // Font size
+        fontSize.addEventListener('change', function() {
+            previewMessage.style.fontSize = this.value + 'px';
+        });
+        
+        // Message size slider
+        messageSize.addEventListener('input', function() {
+            const value = this.value;
+            messageSizeValue.textContent = value + '%';
+            const scale = value / 100;
+            previewMessage.style.transform = `scale(${scale})`;
+            
+            // Update slider background
+            const percentage = ((value - 50) / 150) * 100;
+            this.style.background = `linear-gradient(to right, #2D7FF9 0%, #2D7FF9 ${percentage}%, #E5E5E5 ${percentage}%, #E5E5E5 100%)`;
+        });
+        
+        // Message position slider
+        messagePosition.addEventListener('input', function() {
+            const value = this.value;
+            messagePositionValue.textContent = value + '%';
+            const offset = (value / 100) * 60;
+            previewMessage.style.marginTop = offset + 'px';
+            
+            // Update slider background
+            this.style.background = `linear-gradient(to right, #2D7FF9 0%, #2D7FF9 ${value}%, #E5E5E5 ${value}%, #E5E5E5 100%)`;
+        });
+        
+        // Signature size slider
+        signatureSize.addEventListener('input', function() {
+            const value = this.value;
+            signatureSizeValue.textContent = value + '%';
+            const scale = value / 100;
+            previewFrom.style.transform = `scale(${scale})`;
+            
+            // Update slider background
+            const percentage = ((value - 50) / 150) * 100;
+            this.style.background = `linear-gradient(to right, #2D7FF9 0%, #2D7FF9 ${percentage}%, #E5E5E5 ${percentage}%, #E5E5E5 100%)`;
+        });
+        
+        // Signature position slider
+        signaturePosition.addEventListener('input', function() {
+            const value = this.value;
+            signaturePositionValue.textContent = value + '%';
+            
+            // 0% = at the bottom (where "mike" is in your screenshot)
+            // 100% = higher up (60% of the way up)
+            const bottomStart = 20; // Start 20px from bottom
+            const maxUp = 100; // Can go up to 100px from bottom
+            
+            const offset = bottomStart + (value / 100) * maxUp;
+            previewFrom.style.bottom = offset + 'px';
+            
+            // Update slider background
+            this.style.background = `linear-gradient(to right, #2D7FF9 0%, #2D7FF9 ${value}%, #E5E5E5 ${value}%, #E5E5E5 100%)`;
+        });
+        
+        // Reset links
+        document.getElementById('resetMessageSize').addEventListener('click', function(e) {
+            e.preventDefault();
+            messageSize.value = 100;
+            messageSizeValue.textContent = '100%';
+            previewMessage.style.transform = 'scale(1)';
+            messageSize.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 33.33%, #E5E5E5 33.33%, #E5E5E5 100%)';
+        });
+        
+        document.getElementById('resetMessagePosition').addEventListener('click', function(e) {
+            e.preventDefault();
+            messagePosition.value = 0;
+            messagePositionValue.textContent = '0%';
+            previewMessage.style.marginTop = '0px';
+            messagePosition.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 0%, #E5E5E5 0%, #E5E5E5 100%)';
+        });
+        
+        document.getElementById('resetSignatureSize').addEventListener('click', function(e) {
+            e.preventDefault();
+            signatureSize.value = 100;
+            signatureSizeValue.textContent = '100%';
+            previewFrom.style.transform = 'scale(1)';
+            signatureSize.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 33.33%, #E5E5E5 33.33%, #E5E5E5 100%)';
+        });
+        
+        document.getElementById('resetSignaturePosition').addEventListener('click', function(e) {
+            e.preventDefault();
+            signaturePosition.value = 0;
+            signaturePositionValue.textContent = '0%';
+            previewFrom.style.position = 'absolute';
+            previewFrom.style.bottom = '20px';
+            previewFrom.style.left = '0';
+            previewFrom.style.right = '0';
+            previewFrom.style.width = '100%';
+            signaturePosition.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 0%, #E5E5E5 0%, #E5E5E5 100%)';
+        });
+        
+        // Clear button - simplified to ensure it works
+        clearBtn.addEventListener('click', function() {
+            // Clear inputs
+            messageInput.value = '';
+            fromInput.value = '';
+            fontSelect.value = 'Arial';
+            fontSize.value = '14';
+            messageSize.value = 100;
+            messagePosition.value = 0;
+            signatureSize.value = 100;
+            signaturePosition.value = 0;
+            
+            // Reset displays
+            charCounter.textContent = '0 / 250 characters';
+            charCounter.style.color = '#9A9A9A';
+            messageSizeValue.textContent = '100%';
+            messagePositionValue.textContent = '0%';
+            signatureSizeValue.textContent = '100%';
+            signaturePositionValue.textContent = '0%';
+            
+            // Reset sliders
+            messageSize.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 33.33%, #E5E5E5 33.33%, #E5E5E5 100%)';
+            messagePosition.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 0%, #E5E5E5 0%, #E5E5E5 100%)';
+            signatureSize.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 33.33%, #E5E5E5 33.33%, #E5E5E5 100%)';
+            signaturePosition.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 0%, #E5E5E5 0%, #E5E5E5 100%)';
+            
+            // Reset preview
+            previewMessage.textContent = 'Your message will appear here...';
+            previewMessage.style.color = '#d0d0d0';
+            previewMessage.style.fontFamily = 'Arial';
+            previewMessage.style.fontSize = '14px';
+            previewMessage.style.transform = 'scale(1)';
+            previewMessage.style.marginTop = '10px';
+            
+            previewFrom.textContent = '';
+            previewFrom.style.fontFamily = 'Arial';
+            previewFrom.style.transform = 'scale(1)';
+            previewFrom.style.bottom = '20px';
+            previewFrom.style.left = '0';
+            previewFrom.style.right = '0';
+            previewFrom.style.width = '100%';
+        });
+        
+        // Submit button
+        submitBtn.addEventListener('click', function() {
+            if (!messageInput.value.trim()) {
+                alert('Please enter a gift message');
+                messageInput.focus();
+                return;
+            }
+            alert('✅ Message applied to all 47 recipients!');
+        });
+        
+        // Initialize slider backgrounds and preview position
+        messageSize.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 33.33%, #E5E5E5 33.33%, #E5E5E5 100%)';
+        messagePosition.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 0%, #E5E5E5 0%, #E5E5E5 100%)';
+        signatureSize.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 33.33%, #E5E5E5 33.33%, #E5E5E5 100%)';
+        signaturePosition.style.background = 'linear-gradient(to right, #2D7FF9 0%, #2D7FF9 0%, #E5E5E5 0%, #E5E5E5 100%)';
+        
+        // Set initial message position (near top)
+        previewMessage.style.marginTop = '10px';
+        
+        // Set initial signature position (at bottom like "mike" in screenshot)
+        previewFrom.style.position = 'absolute';
+        previewFrom.style.bottom = '20px';
+        previewFrom.style.left = '0';
+        previewFrom.style.right = '0';
+        previewFrom.style.width = '100%';
+        
+        // Reset link hover effects
+        const resetLinks = document.querySelectorAll('a[id^="reset"]');
+        resetLinks.forEach(link => {
+            link.addEventListener('mouseenter', function() {
+                this.style.color = '#2D7FF9';
+            });
+            link.addEventListener('mouseleave', function() {
+                this.style.color = '#9A9A9A';
+            });
+        });
+    </script>
+</body>
+</html>
