@@ -89,6 +89,15 @@ async function shopifyRequest(endpoint: string, method: string = "GET", body?: a
 }
 
 /**
+ * Season tag used to split corporate orders from regular orders in
+ * Shopify Analytics (filter: order tags contains CORP2026).
+ * Matches the tag already on corporate orders in the store.
+ */
+function corporateYearTag(): string {
+  return `CORP${new Date().getFullYear()}`;
+}
+
+/**
  * Create a parent draft order (for payment collection)
  * This is NOT submitted - it stays as a draft so you can send payment link
  */
@@ -177,7 +186,7 @@ export async function createParentDraftOrder(data: {
       phone: data.senderPhone,
     } : undefined,
     note: `Corporate Gift Order\nCompany: ${data.senderCompany || "N/A"}\nPhone: ${data.senderPhone}\nBilling Address: ${data.senderAddress || "N/A"}\n\nORDER SUMMARY:\nTotal Recipients: ${data.recipients.length}\n- Local Delivery: ${deliverySummary.local_delivery}\n- Shipping (UPS): ${deliverySummary.shipping}\n- Store Pickup: ${deliverySummary.store_pickup}\nTotal Delivery Fees: $${deliverySummary.totalDeliveryFees.toFixed(2)}${data.deliveryDate ? `\n\n📅 Delivery Date: ${data.deliveryDate}` : ''}${data.giftMessage ? `\n\n🎁 Gift Message: ${data.giftMessage}` : ''}${data.giftFrom ? `\n\nGift From: ${data.giftFrom}` : ''}\n\nThis is a parent draft order for payment collection.`,
-    tags: "corporate-gift,parent-order",
+    tags: `corporate-gift,parent-order,${corporateYearTag()}`,
   };
 
   const response = await shopifyRequest("draft_orders.json", "POST", {
@@ -377,7 +386,7 @@ export async function createChildOrder(data: {
     shipping_line: shippingLine,
     note: data.customGiftMessage || "",
     note_attributes: noteAttributes,
-    tags: `corporate-gift,child-order,parent-draft-${data.parentDraftOrderId},delivery:${data.deliveryMethod || 'shipping'}`,
+    tags: `corporate-gift,${corporateYearTag()},child-order,parent-draft-${data.parentDraftOrderId},delivery:${data.deliveryMethod || 'shipping'}`,
     financial_status: "paid", // Mark as paid since it's $0
     send_receipt: false,
     send_fulfillment_receipt: false,
