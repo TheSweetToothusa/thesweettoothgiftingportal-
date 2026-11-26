@@ -3,6 +3,10 @@ import { getSessionCookieOptions } from "./_core/cookies";
 import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
+import { assertOrderAccessConfigured, grantOrderAccess, requireOrderAccess, requireRecipientAccess } from "./orderAccess";
+import { claimOrderForSubmit, releaseSubmitClaim, claimRecipientForRelease, releaseRecipientClaim } from "./orderLocks";
+import { resolveCatalogProduct } from "./pricing";
 import * as db from "./db";
 import * as shopify from "./shopify";
 import { validateAddress } from "./_core/addressValidation";
@@ -19,6 +23,16 @@ function formatDateLocal(date: Date): string {
   const formatted = `${year}-${month}-${day}`;
   console.log(`[formatDateLocal] Input: ${date.toISOString()} → Output: ${formatted}`);
   return formatted;
+}
+
+/** Block recipient changes once the order has been sent to Shopify. */
+function assertOrderEditable(order: { shopifyParentDraftOrderId: string | null }) {
+  if (order.shopifyParentDraftOrderId) {
+    throw new TRPCError({
+      code: "CONFLICT",
+      message: "This order was already submitted. Contact The Sweet Tooth to make changes.",
+    });
+  }
 }
 
 export const appRouter = router({
@@ -49,6 +63,8 @@ export const appRouter = router({
         globalDeliveryDate: z.string().optional(),
       }))
       .mutation(async ({ ctx, input }) => {
+        // Check config first so a missing secret doesn't leave an orphan order.
+        assertOrderAccessConfigured();
         const orderId = await db.createGiftingOrder({
           userId: ctx.user?.id || null,
           senderName: input.senderName,
@@ -66,7 +82,10 @@ export const appRouter = router({
           // Mark Step 1 as complete
           completedStep1: true,
         } as any);
-        
+
+        // Let this browser keep working on its own order (guest checkout).
+        grantOrderAccess(ctx, orderId);
+
         return { orderId };
       }),
 
@@ -78,9 +97,8 @@ export const appRouter = router({
     // Get a specific order with recipients
     getById: publicProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ input }) => {
-        const order = await db.getGiftingOrderById(input.id);
-        if (!order) return null;
+      .query(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.id);
         
         const recipientList = await db.getRecipientsByOrderId(input.id);
         
@@ -100,7 +118,18 @@ export const appRouter = router({
         giftMessageFontSize: z.string().optional(),
         status: z.enum(["draft", "validated", "submitted", "completed"]).optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.id);
+        // After submit, the message, date and font are what's been invoiced and
+        // will be printed/shipped, so they can't change here any more.
+        if (
+          input.globalGiftMessage !== undefined ||
+          input.globalDeliveryDate !== undefined ||
+          input.giftMessageFont !== undefined ||
+          input.giftMessageFontSize !== undefined
+        ) {
+          assertOrderEditable(order);
+        }
         const updates: any = {};
         if (input.globalGiftMessage !== undefined) updates.globalGiftMessage = input.globalGiftMessage;
         if (input.globalDeliveryDate !== undefined) updates.globalDeliveryDate = new Date(input.globalDeliveryDate);
@@ -124,7 +153,9 @@ export const appRouter = router({
         orderId: z.number(),
         deliveryDate: z.string(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.orderId);
+        assertOrderEditable(order);
         await db.updateGiftingOrder(input.orderId, {
           globalDeliveryDate: new Date(input.deliveryDate),
           completedStep2: true,
@@ -140,7 +171,9 @@ export const appRouter = router({
         logoBarSize: z.enum(["small", "large"]).optional(),
         logoBarChocolateType: z.enum(["milk", "white", "dark", "vegan_parve"]).optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.orderId);
+        assertOrderEditable(order);
         const updates: any = {
           wantsLogoBar: input.wantsLogoBar,
           completedStep4: true, // Mark Step 4 complete when logo bar selection is made
@@ -152,23 +185,53 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // Create Shopify draft orders
+    // Step 1 of checkout: create the Shopify parent draft order (the invoice).
+    // No fulfillment orders are created here. They are created by
+    // releaseFulfillment only after the invoice is paid.
     createDraftOrders: publicProcedure
       .input(z.object({ orderId: z.number() }))
-      .mutation(async ({ input }) => {
-        // Get order and recipients
-        const order = await db.getGiftingOrderById(input.orderId);
-        if (!order) {
-          throw new Error("Order not found");
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.orderId);
+
+        // Never create a second invoice for the same order (double-click, retry).
+        if (order.shopifyParentDraftOrderId) {
+          throw new TRPCError({ code: "CONFLICT", message: "This order was already submitted." });
         }
 
         const recipients = await db.getRecipientsByOrderId(input.orderId);
         if (recipients.length === 0) {
-          throw new Error("No recipients found for this order");
+          throw new TRPCError({ code: "BAD_REQUEST", message: "No recipients found for this order" });
         }
 
-        // Create Shopify orders
-        const result = await shopify.createGiftingOrders({
+        // Price every gift from the catalog on the server. Reject unknown products.
+        const unknown: string[] = [];
+        const priced = recipients.map(r => {
+          const product = resolveCatalogProduct(r.productName, r.productVariantId);
+          if (!product) unknown.push(`${r.recipientName} (${r.productName || "no product"})`);
+          return { r, product };
+        });
+        if (unknown.length > 0) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `These recipients don't have a valid product: ${unknown.join("; ")}`,
+          });
+        }
+
+        // Atomic claim: if two submits run at once, only one gets past here.
+        if (!(await claimOrderForSubmit(input.orderId))) {
+          throw new TRPCError({ code: "CONFLICT", message: "This order was already submitted." });
+        }
+
+        let parentDraft: { draftOrderId: string; draftOrderNumber: string };
+        try {
+          // Store the catalog name so fulfillment orders show the real product.
+          for (const { r, product } of priced) {
+            if (r.productName !== product!.name) {
+              await db.updateRecipient(r.id, { productName: product!.name });
+            }
+          }
+
+          parentDraft = await shopify.createParentDraftOrder({
           senderName: order.senderName,
           senderEmail: order.senderEmail,
           senderPhone: order.senderPhone,
@@ -176,7 +239,77 @@ export const appRouter = router({
           senderAddress: order.senderAddress || undefined,
           giftMessage: order.globalGiftMessage || undefined,
           deliveryDate: order.globalDeliveryDate ? formatDateLocal(order.globalDeliveryDate) : undefined,
-          recipients: recipients.map(r => ({
+          recipients: priced.map(({ r, product }) => ({
+            recipientName: r.recipientName,
+            address1: r.address1,
+            address2: r.address2 || undefined,
+            city: r.city,
+            state: r.state,
+            zip: r.zip,
+            deliveryMethod: r.deliveryMethod || undefined,
+            productName: product!.name,
+            unitPrice: product!.price,
+          })),
+          });
+        } catch (error) {
+          // Nothing was created in Shopify, so let the customer try again.
+          await releaseSubmitClaim(input.orderId);
+          throw error;
+        }
+
+        await db.updateGiftingOrder(input.orderId, {
+          shopifyParentDraftOrderId: parentDraft.draftOrderId,
+          status: "submitted",
+        });
+
+        return {
+          success: true,
+          parentDraftOrder: { id: parentDraft.draftOrderId, number: parentDraft.draftOrderNumber },
+          childOrderCount: 0,
+        };
+      }),
+
+    // Step 2 of checkout: once the invoice is PAID in Shopify, create the
+    // $0 fulfillment orders that go to ShipStation / local delivery.
+    // Safe to call again: recipients that already have an order are skipped.
+    // Admins can pass overridePayment for customers on payment terms.
+    releaseFulfillment: publicProcedure
+      .input(z.object({ orderId: z.number(), overridePayment: z.boolean().optional() }))
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.orderId);
+        const parentDraftOrderId = order.shopifyParentDraftOrderId;
+        if (!parentDraftOrderId || parentDraftOrderId === "SUBMITTING") {
+          throw new TRPCError({ code: "BAD_REQUEST", message: "This order hasn't been submitted yet." });
+        }
+
+        const isAdmin = ctx.user?.role === "admin";
+        if (input.overridePayment && !isAdmin) {
+          throw new TRPCError({ code: "FORBIDDEN", message: "Only staff can release unpaid orders." });
+        }
+
+        const payment = await shopify.getDraftOrderPaymentStatus(parentDraftOrderId);
+        if (!payment.paid && !input.overridePayment) {
+          throw new TRPCError({
+            code: "PRECONDITION_FAILED",
+            message: `The invoice isn't paid yet (draft: ${payment.draftStatus}, payment: ${payment.financialStatus ?? "none"}).`,
+          });
+        }
+
+        const allRecipients = await db.getRecipientsByOrderId(input.orderId);
+
+        // Atomic claim per recipient: if two releases run at once, each gift
+        // is created by only one of them.
+        const pending: typeof allRecipients = [];
+        for (const r of allRecipients) {
+          if (!r.shopifyChildOrderId && (await claimRecipientForRelease(r.id))) {
+            pending.push(r);
+          }
+        }
+
+        const result = await shopify.createFulfillmentOrders({
+          parentDraftOrderId,
+          senderCompany: order.senderCompany || undefined,
+          recipients: pending.map(r => ({
             id: r.id,
             recipientName: r.recipientName,
             recipientEmail: r.recipientEmail || undefined,
@@ -193,23 +326,22 @@ export const appRouter = router({
           })),
         });
 
-        // Update order with parent draft order ID
-        await db.updateGiftingOrder(input.orderId, {
-          shopifyParentDraftOrderId: result.parentDraftOrder.id,
-          status: "submitted",
-        });
-
-        // Update recipients with child order IDs
         for (const childOrder of result.childOrders) {
           await db.updateRecipient(childOrder.recipientId, {
             shopifyChildOrderId: childOrder.orderId,
           });
         }
+        // Shopify refused these, so free them up for a retry.
+        for (const failedId of result.failedRecipientIds) {
+          await releaseRecipientClaim(failedId);
+        }
 
         return {
-          success: true,
-          parentDraftOrder: result.parentDraftOrder,
-          childOrderCount: result.childOrders.length,
+          success: result.failedRecipientIds.length === 0,
+          createdCount: result.childOrders.length,
+          alreadyReleasedCount: allRecipients.length - pending.length,
+          paymentOverridden: !payment.paid,
+          failedRecipientIds: result.failedRecipientIds,
         };
       }),
   }),
@@ -234,7 +366,9 @@ export const appRouter = router({
         productVariantId: z.string().optional(),
         productName: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.giftingOrderId);
+        assertOrderEditable(order);
         const recipientData = {
           giftingOrderId: input.giftingOrderId,
           recipientName: input.recipientName,
@@ -285,7 +419,9 @@ export const appRouter = router({
           productName: z.string().optional(),
         })),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireOrderAccess(ctx, input.giftingOrderId);
+        assertOrderEditable(order);
         const recipientData = input.recipients.map(r => ({
           giftingOrderId: input.giftingOrderId,
           recipientName: r.recipientName,
@@ -326,7 +462,9 @@ export const appRouter = router({
         deliveryDate: z.string().optional(),
         customGiftMessage: z.string().optional(),
       }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireRecipientAccess(ctx, input.id);
+        assertOrderEditable(order);
         const { id, ...updates } = input;
         const dbUpdates: any = {};
         
@@ -347,7 +485,9 @@ export const appRouter = router({
     // Delete a recipient
     delete: publicProcedure
       .input(z.object({ id: z.number() }))
-      .mutation(async ({ input }) => {
+      .mutation(async ({ ctx, input }) => {
+        const order = await requireRecipientAccess(ctx, input.id);
+        assertOrderEditable(order);
         await db.deleteRecipient(input.id);
         return { success: true };
       }),

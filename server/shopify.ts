@@ -103,25 +103,27 @@ export async function createParentDraftOrder(data: {
   deliveryDate?: string;
   recipients: Array<{
     recipientName: string;
-    productName?: string;
     address1: string;
     address2?: string;
     city: string;
     state: string;
     zip: string;
     deliveryMethod?: string;
+    /** Catalog name of the product (resolved on the server, see server/pricing.ts) */
+    productName: string;
+    /** Catalog unit price in dollars (resolved on the server, never from the client) */
+    unitPrice: number;
   }>;
 }): Promise<{ draftOrderId: string; draftOrderNumber: string }> {
-  // Calculate line items from recipients (products)
+  // Line items use the server-resolved catalog name and price only.
   const lineItems: ShopifyLineItem[] = data.recipients.map((recipient) => {
-    // Extract price from product name (e.g., "Holiday Basket ($69.00)")
-    const priceMatch = recipient.productName?.match(/\$(\d+\.?\d*)/);
-    const price = priceMatch ? priceMatch[1] : "69.00";
-
+    if (!Number.isFinite(recipient.unitPrice) || recipient.unitPrice <= 0) {
+      throw new Error(`Invalid catalog price for recipient ${recipient.recipientName}`);
+    }
     return {
-      title: recipient.productName || "Gift Basket",
+      title: recipient.productName,
       quantity: 1,
-      price: price,
+      price: recipient.unitPrice.toFixed(2),
     };
   });
 
@@ -394,19 +396,36 @@ export async function createChildOrder(data: {
 }
 
 /**
- * Create all orders for a gifting batch:
- * 1. One parent draft order (for payment)
- * 2. Multiple child orders at $0 (for fulfillment)
+ * Check whether a parent draft order has been paid.
+ * A draft is paid once it has been converted to an order (status "completed")
+ * and that order's financial_status is "paid".
  */
-export async function createGiftingOrders(data: {
-  senderName: string;
-  senderEmail: string;
-  senderPhone: string;
+export async function getDraftOrderPaymentStatus(draftOrderId: string): Promise<{
+  paid: boolean;
+  draftStatus: string;
+  financialStatus: string | null;
+}> {
+  const draftResponse = await shopifyRequest(`draft_orders/${encodeURIComponent(draftOrderId)}.json`);
+  const draft = draftResponse.draft_order;
+  const draftStatus: string = draft?.status ?? "unknown";
+  if (draftStatus !== "completed" || !draft?.order_id) {
+    return { paid: false, draftStatus, financialStatus: null };
+  }
+  const orderResponse = await shopifyRequest(`orders/${draft.order_id}.json`);
+  const financialStatus: string | null = orderResponse.order?.financial_status ?? null;
+  return { paid: financialStatus === "paid", draftStatus, financialStatus };
+}
+
+/**
+ * Create one $0 fulfillment (child) order per recipient.
+ * Call this ONLY after the parent draft order is paid
+ * (see getDraftOrderPaymentStatus). Child orders are marked "paid" in
+ * Shopify and flow straight to ShipStation / local delivery.
+ */
+export async function createFulfillmentOrders(data: {
+  parentDraftOrderId: string;
   senderCompany?: string;
-  senderAddress?: string;
   giftFrom?: string;
-  giftMessage?: string;
-  deliveryDate?: string;
   recipients: Array<{
     id: number;
     recipientName: string;
@@ -424,25 +443,12 @@ export async function createGiftingOrders(data: {
     logoBar?: "none" | "small" | "large";
   }>;
 }): Promise<{
-  parentDraftOrder: { id: string; number: string };
   childOrders: Array<{ recipientId: number; orderId: string; orderNumber: string }>;
+  failedRecipientIds: number[];
 }> {
-  // Step 1: Create parent draft order
-  const parentDraft = await createParentDraftOrder({
-    senderName: data.senderName,
-    senderEmail: data.senderEmail,
-    senderPhone: data.senderPhone,
-    senderCompany: data.senderCompany,
-    senderAddress: data.senderAddress,
-    giftFrom: data.giftFrom,
-    giftMessage: data.giftMessage,
-    deliveryDate: data.deliveryDate,
-    recipients: data.recipients,
-  });
-
-  // Step 2: Create child orders for each recipient
   const childOrders: Array<{ recipientId: number; orderId: string; orderNumber: string }> = [];
-  
+  const failedRecipientIds: number[] = [];
+
   for (const recipient of data.recipients) {
     try {
       const childOrder = await createChildOrder({
@@ -460,10 +466,9 @@ export async function createGiftingOrders(data: {
         deliveryMethod: recipient.deliveryMethod,
         deliveryDate: recipient.deliveryDate,
         logoBar: recipient.logoBar,
-        parentDraftOrderId: parentDraft.draftOrderId,
+        parentDraftOrderId: data.parentDraftOrderId,
         senderCompany: data.senderCompany,
       });
-
       childOrders.push({
         recipientId: recipient.id,
         orderId: childOrder.orderId,
@@ -471,15 +476,9 @@ export async function createGiftingOrders(data: {
       });
     } catch (error) {
       console.error(`Failed to create child order for recipient ${recipient.id}:`, error);
-      // Continue with other recipients even if one fails
+      failedRecipientIds.push(recipient.id);
     }
   }
 
-  return {
-    parentDraftOrder: {
-      id: parentDraft.draftOrderId,
-      number: parentDraft.draftOrderNumber,
-    },
-    childOrders,
-  };
+  return { childOrders, failedRecipientIds };
 }
